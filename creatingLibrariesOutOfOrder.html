@@ -24,15 +24,21 @@
       // If using
       if (arguments.length === 1) {
         var library = libraryStorage[libraryName];
-        var dependencyNames = library.dependencyNames;
-        var callback = library.callback;
 
-        var dependencies = dependencyNames.map(function (dependencyName) {
-          return libraryStorage[dependencyName].callback();
-        });
+        // If library has not been run with loaded dependencies
+        // Then use callback and dependencies to run it
+        if(!library.hasOwnProperty('callbackWithDependencies')){
+          var dependencyNames = library.dependencyNames;
+          var callback = library.callback;
+          var dependencies = dependencyNames.map(function (dependencyName) {
+            return libraryStorage[dependencyName].callback();
+          });
 
+          library.callbackWithDependencies = callback.apply(this, dependencies);
+        }
 
-        return callback.apply(this, dependencies);
+        return library.callbackWithDependencies;
+
       }
 
       // If creating
@@ -120,7 +126,20 @@
       eq(librarySystem('workBlurb'), 'Gordon works at Watch and Code');
       resetLibraryStorage();
     },
-    "6) If a library is used > 1 time, callback should only be run once.": function() {
+    "6) If a library with 0 dependencies is used > 1 time, callback should only be run once.": function() {
+      var numberOfTimesCallbackHasRun = 0;
+
+      librarySystem('name', [], function () {
+        numberOfTimesCallbackHasRun++;
+        return 'Gordon';
+      });
+
+      librarySystem('name');
+      librarySystem('name');
+      eq(numberOfTimesCallbackHasRun, 1);
+      resetLibraryStorage();
+    },
+    "7) If a library with >=1 dependencies is used > 1 time, callback should only be run once.": function() {
       var timesNameCallbackHasRun = 0;
       var timesLibrarySystemCallbackHasRun = 0;
 
@@ -134,14 +153,12 @@
         return name + ' works at Watch and Code';
       });
 
-      debugger;
+      librarySystem('name');
       librarySystem('workBlurb');
       librarySystem('workBlurb');
-
       eq(timesNameCallbackHasRun, 1);
       eq(timesLibrarySystemCallbackHasRun, 1);
-
       resetLibraryStorage();
-    }
+    },
   });
 </script>
