@@ -11,7 +11,8 @@
   callback - A function that returns an object that contains the library to be added to the project.
 
   Return value:
-  The library and all of its dependencies.
+  if arguments.length === 1, the library that the user requested
+  if arguments.length !== 1, undefined
 
   */
 
@@ -27,17 +28,21 @@
 
         // If library has not been run with loaded dependencies
         // Then use callback and dependencies to run it
-        if(!library.hasOwnProperty('callbackWithDependencies')){
+        if(!library.hasOwnProperty('withLoadedDependencies')){
           var dependencyNames = library.dependencyNames;
           var callback = library.callback;
           var dependencies = dependencyNames.map(function (dependencyName) {
-            return libraryStorage[dependencyName].callback();
+            var dependency = librarySystem(dependencyName);
+            return dependency;
           });
 
-          library.callbackWithDependencies = callback.apply(this, dependencies);
+          var withLoadedDependencies = callback.apply(this, dependencies);
+          library.withLoadedDependencies = withLoadedDependencies;
         }
 
-        return library.callbackWithDependencies;
+        // If library has already been run with loaded dependencies
+        // Then retrieve the value returned by the library
+        return library.withLoadedDependencies;
 
       }
 
@@ -139,12 +144,10 @@
       eq(numberOfTimesCallbackHasRun, 1);
       resetLibraryStorage();
     },
-    "7) If a library with >=1 dependencies is used > 1 time, callback should only be run once.": function() {
-      var timesNameCallbackHasRun = 0;
+    "7) If a library with > 0 dependencies is used > 1 time, the library's callback should only be run once.": function() {
       var timesLibrarySystemCallbackHasRun = 0;
 
       librarySystem('name', [], function () {
-        timesNameCallbackHasRun++;
         return 'Gordon';
       });
 
@@ -153,11 +156,46 @@
         return name + ' works at Watch and Code';
       });
 
+      // Run workBlurb 3 times.
+      for(var i=0; i<3; i++){
+        librarySystem('workBlurb');
+      }
+
+      eq(timesLibrarySystemCallbackHasRun, 1);
+      resetLibraryStorage();
+    },
+    "8) If a library is run and used as a dependency, callback should only be run once.": function() {
+      var numberOfTimesCallbackHasRun = 0;
+
+      librarySystem('name', [], function () {
+        numberOfTimesCallbackHasRun++;
+        return 'Gordon';
+      });
+
+      librarySystem('workBlurb', ['name'], function (name) {
+        return name + ' works at Watch and Code';
+      });
+
       librarySystem('name');
       librarySystem('workBlurb');
-      librarySystem('workBlurb');
-      eq(timesNameCallbackHasRun, 1);
-      eq(timesLibrarySystemCallbackHasRun, 1);
+
+      eq(numberOfTimesCallbackHasRun, 1);
+      resetLibraryStorage();
+    },
+    "9) It should load dependencies into nested dependencis.": function() {
+      librarySystem('nestedDependency', [], function () {
+        return 'and nested dependency';
+      });
+
+      librarySystem('originalDependency', ['nestedDependency'], function (nestedDependency) {
+        return ', original dependency ' + nestedDependency;
+      });
+
+      librarySystem('library', ['originalDependency'], function (originalDependency) {
+        return 'Library' + originalDependency;
+      });
+
+      eq(librarySystem('library'), 'Library, original dependency and nested dependency');;
       resetLibraryStorage();
     },
   });
